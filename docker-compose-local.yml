@@ -1,8 +1,10 @@
 version: "3.5"
 
 services:
-  api01: &api
-    image: 4emcos/rinha-backend-nodejs:latest
+  api01:
+    # image: 4emcos/rinha-backend-nodejs:latest
+    &api
+    build: .
     hostname: api01
     environment:
       - DB_HOST=db
@@ -49,4 +51,3 @@ services:
         limits:
           cpus: "0.56"
           memory: "410MB"
-
