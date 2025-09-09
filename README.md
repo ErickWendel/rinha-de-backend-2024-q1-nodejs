@@ -38,8 +38,7 @@ docker-compose up --build
 Após subir os containers:
 
 1. Acesse o Grafana em [http://localhost:3000/dashboards](http://localhost:3000/dashboards)
-2. Selecione o dashboard **HTTP Metrics OpenTelemetry**, que é baseado neste template oficial do Grafana:
-   👉 [https://grafana.com/grafana/dashboards/18860-http-metrics-opentelemetry/](https://grafana.com/grafana/dashboards/18860-http-metrics-opentelemetry/)
+2. Selecione o dashboard **HTTP Metrics OpenTelemetry**, que é baseado neste [template oficial do Grafana](https://grafana.com/grafana/dashboards/18860-http-metrics-opentelemetry/):
 3. Em seguida, execute o script abaixo para gerar carga de teste e visualizar os dados no dashboard:
 
 ```bash
