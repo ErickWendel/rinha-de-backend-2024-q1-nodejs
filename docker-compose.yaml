@@ -1,0 +1,116 @@
+version: "3.5"
+
+services:
+  api01:
+    # image: 4emcos/rinha-backend-nodejs:latest
+    &api
+    build: .
+    hostname: api01
+    environment:
+      - DB_HOST=db
+
+      - OTEL_LOGS_EXPORTER=none
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://opentelemetry-collector:4317
+
+      - OTEL_METRIC_EXPORT_INTERVAL=5000
+      - OTEL_METRIC_EXPORT_TIMEOUT=5000
+    restart: unless-stopped
+    depends_on:
+      - db
+      - opentelemetry-collector
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "0.37"
+    #       memory: "55MB"
+
+  api02:
+    <<: *api
+    hostname: api02
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./devops/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api01
+      - api02
+    ports:
+      - "9999:9999"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "30MB"
+
+  db:
+    image: postgres:latest
+    hostname: db
+    environment:
+      - POSTGRES_PASSWORD=oot123
+      - POSTGRES_USER=admin
+      - POSTGRES_DB=rinha
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./devops/sql/ddl.sql:/docker-entrypoint-initdb.d/script.sql
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "0.56"
+    #       memory: "410MB"
+
+    # ------ monitoring services -------
+  opentelemetry-collector:
+    hostname: opentelemetry-collector
+    image: otel/opentelemetry-collector:latest
+    command: [ "--config=/etc/otel-collector-config.yml", "--feature-gates=pkg.translator.prometheus.NormalizeName" ]
+    volumes:
+      - ./infra/otel-collector-config.yml:/etc/otel-collector-config.yml
+    restart: unless-stopped
+    environment:
+      - DEPLOY_ENV=dev
+    ports:
+      - "8888:8888" # Prometheus metrics exposed by the collector
+      - "8889:8889" # Prometheus exporter metrics
+      - "4317:4317" # OTLP gRPC receiver
+    depends_on:
+      - prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning #https://grafana.com/docs/grafana/latest/administration/provisioning/
+      - ./data/grafana-data:/var/lib/grafana
+      - /etc/localtime:/etc/localtime:ro
+
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-exploretraces-app/grafana-exploretraces-app-latest.zip;grafana-traces-app
+
+    links:
+      - opentelemetry-collector
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=otlp-write-receiver
+      - --enable-feature=exemplar-storage
+      - --enable-feature=native-histograms
+    volumes:
+      - ./infra/prometheus.yaml:/etc/prometheus.yaml
+      - /etc/localtime:/etc/localtime:ro
+      - ./data/prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
