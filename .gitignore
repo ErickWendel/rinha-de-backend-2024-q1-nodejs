@@ -3,4 +3,5 @@ node_modules
 dist
 pnpm-lock.yaml
 data
-load-test/user-files
+load-test/user-files/
+inc_compile.zip
